@@ -1,0 +1,70 @@
+# ============================================================================
+# 华为云 CCE 工作负载清单：Express Web 应用
+# 部署方式：kubectl apply（变量通过 envsubst 注入，见部署指导书）
+#   export NAMESPACE=<命名空间> ELB_ID=<terraform output elb_id> SWR_IMAGE=<镜像地址>
+#   envsubst < src/workloads/express-deployment.yaml | kubectl apply -f -
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: express-app
+  namespace: ${NAMESPACE}
+  labels:
+    app: express-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: express-app
+  template:
+    metadata:
+      labels:
+        app: express-app
+    spec:
+      containers:
+        - name: express-app
+          image: ${SWR_IMAGE}
+          ports:
+            - containerPort: 8080
+          # 就绪探针：负载均衡仅将流量转发到就绪的 Pod
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # 存活探针：异常 Pod 会被自动重启
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: express-app
+  namespace: ${NAMESPACE}
+  annotations:
+    # 复用 Terraform 创建的独享型 ELB（性能保障模式）
+    kubernetes.io/elb.id: "${ELB_ID}"
+    kubernetes.io/elb.class: performance
+    # 禁用会话保持，适配无状态 Web 服务
+    kubernetes.io/session-affinity: "false"
+spec:
+  selector:
+    app: express-app
+  # LoadBalancer 类型由 CCE 云原生控制器将 ELB 与 Service 关联
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

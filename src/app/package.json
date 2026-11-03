@@ -1,0 +1,13 @@
+{
+  "name": "express-cce-practice",
+  "version": "1.0.0",
+  "description": "Sample Node.js (Express) web application for Huawei Cloud CCE",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "license": "MIT-0",
+  "dependencies": {
+    "express": "^4.22.2"
+  }
+}
